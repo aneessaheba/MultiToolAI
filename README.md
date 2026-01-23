@@ -1,17 +1,15 @@
 # Multi-Agent Calculator System
 
+Learning to build multi-agent systems with LLMs step by step.
+
 ---
-## Project Structure
 
-```
-Calculator_multi_agent/
-├── calculator_tool.py    # Step 1: Basic calculator tool
-├── calculator_agent.py   # Step 2: LLM agent using Gemini 3 Pro
-└── README.md            # This file
+## Progress
 
-### Step 1: Simple Calculator Tool
+### ✅ Step 1: Simple Calculator Tool
+
+**What we built:**
 - A basic calculator tool that does simple math
-
 
 **File:** `calculator_tool.py`
 
@@ -22,8 +20,7 @@ python calculator_tool.py
 
 ---
 
-
-### Step 2: LLM Agent with Gemini 3 Pro
+### ✅ Step 2: LLM Agent with Gemini 3 Pro
 
 **What we built:**
 - Added Gemini 3 Pro to understand natural language
@@ -54,5 +51,10 @@ python calculator_agent.py
 
 ---
 
-
+## Project Structure
+```
+Calculator_multi_agent/
+├── calculator_tool.py    # Step 1: Basic calculator tool
+├── calculator_agent.py   # Step 2: LLM agent using Gemini 3 Pro
+└── README.md            # This file
 ```
