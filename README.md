@@ -22,14 +22,6 @@ python calculator_tool.py
 
 ---
 
-## Project Structure
-
-```
-Calculator_multi_agent/
-├── calculator_tool.py    # Step 1: Basic calculator tool
-└── README.md            # This file
-```
-
 
 ### Step 2: LLM Agent with Gemini 3 Pro
 
