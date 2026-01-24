@@ -6,7 +6,7 @@ Learning to build multi-agent systems with LLMs step by step.
 
 ## Progress
 
-### ✅ Step 1: Simple Calculator Tool
+###  Step 1: Simple Calculator Tool
 
 **What we built:**
 - Basic calculator tool that evaluates math expressions
@@ -15,7 +15,7 @@ Learning to build multi-agent systems with LLMs step by step.
 
 ---
 
-### ✅ Step 2: Calculator Agent with LangChain
+###  Step 2: Calculator Agent with LangChain
 
 **What we built:**
 - Agent that understands natural language questions
@@ -33,7 +33,7 @@ python calculator_agent.py
 
 ---
 
-### ✅ Step 3: Specialized Agents
+###  Step 3: Specialized Agents
 
 **What we built:**
 - Four specialized tools: add, subtract, multiply, divide
