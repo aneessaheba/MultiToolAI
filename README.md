@@ -1,58 +1,60 @@
-# Multi-Agent Calculator System
+# Multi-Tool AI Agent with Memory
 
-Learning to build multi-agent systems with LLMs step by step.
+AI assistant powered by Google Gemini with multiple tools and semantic memory.
 
----
+## Features
 
-## Progress
+### Available Tools
+- Calculator
+- Weather
+- Wikipedia Search
+- Google Search
+- Web Scraper
+- Email
+- Text Summarizer
+- Memory System (semantic search with ChromaDB)
 
-###  Step 1: Simple Calculator Tool
+## Installation
 
-**What we built:**
-- Basic calculator tool that evaluates math expressions
-
-**File:** `calculator_tool.py`
-
----
-
-###  Step 2: Calculator Agent with LangChain
-
-**What we built:**
-- Agent that understands natural language questions
-- Uses Gemini 2.5 Flash and LangChain
-- Calls calculator_tool for math operations
-
-**File:** `calculator_agent.py`
-
-**Setup:**
 ```bash
-pip install langchain langchain-google-genai
-export GOOGLE_API_KEY='your-key-here'
-python calculator_agent.py
+pip install langchain langchain-google-genai chromadb wikipedia googlesearch-python beautifulsoup4 requests python-dotenv fastapi uvicorn
 ```
 
----
+Create `.env` file:
 
-###  Step 3: Specialized Agents
-
-**What we built:**
-- Four specialized tools: add, subtract, multiply, divide
-- Agent chooses the right tool for each operation
-
-**File:** `specialized_agents.py`
-
-**How to use:**
-```bash
-python specialized_agents.py
+```env
+GOOGLE_API_KEY=your_google_api_key_here
+EMAIL_ADDRESS=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+GOOGLE_SEARCH_API_KEY=your_search_api_key
+GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
 ```
 
----
+## Usage
+
+### Command Line
+```bash
+python main.py
+```
+
+### API Server
+```bash
+uvicorn api:app --reload
+```
+
+API Documentation: http://localhost:8000/docs
 
 ## Project Structure
+
 ```
-Calculator_multi_agent/
-├── calculator_tool.py       # Step 1: Basic calculator tool
-├── calculator_agent.py      # Step 2: LangChain agent
-├── specialized_agents.py    # Step 3: Specialized operation tools
-└── README.md               # This file
+CALCULATOR_MULTI_AGENT/
+├── chroma_memory/          # Memory database
+├── venv/                   # Virtual environment
+├── .env                    # Environment variables
+├── .gitignore             
+├── api.py                  # FastAPI server
+├── gemini_service.py       # Agent configuration
+├── main.py                 # Command-line interface
+├── tools.py                # All tools including memory
+└── README.md
 ```
