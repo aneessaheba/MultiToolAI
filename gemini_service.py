@@ -7,8 +7,13 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.prompts import ChatPromptTemplate
+from tools import ALL_TOOLS
 
+# Load environment variables
 load_dotenv()
+
+# Available tools
+TOOLS = ALL_TOOLS
 
 def get_llm():
     """Initialize and return Gemini LLM"""
@@ -19,8 +24,8 @@ def get_llm():
         enable_thought_signatures=True
     )
 
-def create_agent(tools):
-    """Create agent with provided tools"""
+def create_agent():
+    """Create agent with all available tools"""
     
     llm = get_llm()
     
@@ -30,5 +35,5 @@ def create_agent(tools):
         ("placeholder", "{agent_scratchpad}"),
     ])
     
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_tool_calling_agent(llm, TOOLS, prompt)
+    return AgentExecutor(agent=agent, tools=TOOLS, verbose=True)
