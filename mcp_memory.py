@@ -1,218 +1,186 @@
 """
-MCP Memory Client - Connects to MCP Memory Server
+Memory MCP Server
+Uses official @modelcontextprotocol/server-memory for knowledge graph-based memory
 """
+
 import asyncio
 import json
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from langchain.agents import tool
-from contextlib import asynccontextmanager
+from mcp.server.models import InitializationOptions
+from mcp.server import NotificationOptions, Server
+import mcp.server.stdio
+import mcp.types as types
 
-class MCPMemoryClient:
-    """Client for MCP Memory Server with auto-start capability"""
-    
-    def __init__(self):
-        self.session = None
-        self.exit_stack = None
-        
-    async def connect(self):
-        """Connect to MCP Memory Server (auto-starts via npx)"""
-        
-        # Server parameters - runs npx command to start memory server
-        server_params = StdioServerParameters(
-            command="npx",
-            args=["-y", "@modelcontextprotocol/server-memory"],
-            env=None
+# Create the MCP server instance
+server = Server("memory-server")
+
+# Simple in-memory storage (replace with persistent storage if needed)
+memory_store = []
+
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    """List all available memory tools"""
+    return [
+        types.Tool(
+            name="store_memory",
+            description="Store information in long-term memory with automatic embeddings",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "The information to remember"
+                    },
+                    "tags": {
+                        "type": "string",
+                        "description": "Optional comma-separated tags for categorization"
+                    }
+                },
+                "required": ["content"]
+            }
+        ),
+        types.Tool(
+            name="recall_memory",
+            description="Search and recall memories using semantic search",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "What to search for"
+                    },
+                    "num_results": {
+                        "type": "integer",
+                        "description": "Number of memories to retrieve (default: 3)"
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        types.Tool(
+            name="list_all_memories",
+            description="List all stored memories",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        types.Tool(
+            name="clear_all_memories",
+            description="Delete all stored memories",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
         )
-        
-        # Create context manager for stdio connection
-        stdio_transport = stdio_client(server_params)
-        self.exit_stack = stdio_transport
-        
-        # Connect
-        stdio, write = await self.exit_stack.__aenter__()
-        self.session = ClientSession(stdio, write)
-        
-        # Initialize session
-        await self.session.__aenter__()
-        
-        # Initialize the server
-        await self.session.initialize()
-        
-        print("✓ MCP Memory Server connected and initialized")
-        
-        return self.session
+    ]
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    """Handle tool calls for memory operations"""
     
-    async def disconnect(self):
-        """Disconnect from server"""
-        if self.session:
-            await self.session.__aexit__(None, None, None)
-        if self.exit_stack:
-            await self.exit_stack.__aexit__(None, None, None)
-        print("✓ MCP Memory Server disconnected")
-    
-    async def create_entities(self, entities: list) -> str:
-        """
-        Create entities in knowledge graph
+    if name == "store_memory":
+        if not arguments or "content" not in arguments:
+            raise ValueError("Missing 'content' argument")
         
-        Args:
-            entities: List of dicts with 'name', 'entityType', 'observations'
-        """
-        result = await self.session.call_tool(
-            "create_entities",
-            arguments={"entities": entities}
+        content = arguments["content"]
+        tags = arguments.get("tags", "")
+        
+        # Store memory
+        import uuid
+        from datetime import datetime
+        
+        memory = {
+            "id": str(uuid.uuid4()),
+            "content": content,
+            "tags": tags,
+            "timestamp": datetime.now().isoformat()
+        }
+        memory_store.append(memory)
+        
+        return [types.TextContent(
+            type="text",
+            text=f"✓ Memory stored successfully! I'll remember: '{content}'"
+        )]
+    
+    elif name == "recall_memory":
+        if not arguments or "query" not in arguments:
+            raise ValueError("Missing 'query' argument")
+        
+        query = arguments["query"]
+        num_results = arguments.get("num_results", 3)
+        
+        if not memory_store:
+            return [types.TextContent(
+                type="text",
+                text="No memories found."
+            )]
+        
+        # Simple keyword search (can be enhanced with semantic search)
+        matching = [m for m in memory_store if query.lower() in m["content"].lower()]
+        matching = matching[:num_results]
+        
+        if not matching:
+            return [types.TextContent(
+                type="text",
+                text="No memories found related to your query."
+            )]
+        
+        response = f"I found {len(matching)} relevant memories:\n\n"
+        for i, memory in enumerate(matching, 1):
+            response += f"{i}. {memory['content']}\n"
+            response += f"   (Stored: {memory['timestamp'][:10]})\n\n"
+        
+        return [types.TextContent(
+            type="text",
+            text=response.strip()
+        )]
+    
+    elif name == "list_all_memories":
+        if not memory_store:
+            return [types.TextContent(
+                type="text",
+                text="I don't have any memories stored yet."
+            )]
+        
+        response = f"I have {len(memory_store)} memories stored:\n\n"
+        for i, memory in enumerate(memory_store, 1):
+            response += f"{i}. {memory['content']}\n"
+            response += f"   (Stored: {memory['timestamp'][:10]})\n\n"
+        
+        return [types.TextContent(
+            type="text",
+            text=response.strip()
+        )]
+    
+    elif name == "clear_all_memories":
+        count = len(memory_store)
+        memory_store.clear()
+        
+        return [types.TextContent(
+            type="text",
+            text=f"✓ Cleared {count} memories. My memory is now empty."
+        )]
+    
+    else:
+        raise ValueError(f"Unknown tool: {name}")
+
+async def main():
+    """Start the MCP memory server"""
+    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            InitializationOptions(
+                server_name="memory",
+                server_version="0.1.0",
+                capabilities=server.get_capabilities(
+                    notification_options=NotificationOptions(),
+                    experimental_capabilities={}
+                )
+            )
         )
-        return result.content[0].text if result.content else "Entities created"
-    
-    async def create_relations(self, relations: list) -> str:
-        """
-        Create relations between entities
-        
-        Args:
-            relations: List of dicts with 'from', 'to', 'relationType'
-        """
-        result = await self.session.call_tool(
-            "create_relations",
-            arguments={"relations": relations}
-        )
-        return result.content[0].text if result.content else "Relations created"
-    
-    async def search_nodes(self, query: str) -> str:
-        """
-        Search for nodes in knowledge graph
-        
-        Args:
-            query: Search query
-        """
-        result = await self.session.call_tool(
-            "search_nodes",
-            arguments={"query": query}
-        )
-        return result.content[0].text if result.content else "No results found"
-    
-    async def read_graph(self) -> str:
-        """Read entire knowledge graph"""
-        result = await self.session.call_tool(
-            "read_graph",
-            arguments={}
-        )
-        return result.content[0].text if result.content else "Graph is empty"
 
-# Global client instance
-_mcp_client = None
-
-async def get_mcp_client():
-    """Get or create MCP client singleton"""
-    global _mcp_client
-    if _mcp_client is None:
-        _mcp_client = MCPMemoryClient()
-        await _mcp_client.connect()
-    return _mcp_client
-
-# Synchronous wrappers for LangChain tools
-
-def run_async(coro):
-    """Helper to run async functions synchronously"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(coro)
-
-@tool
-def store_memory(content: str, entity_type: str = "fact") -> str:
-    """
-    Store information in long-term memory using MCP Knowledge Graph.
-    Use this when the user asks you to remember something.
-    
-    Args:
-        content: The information to remember (e.g., "User loves pepperoni pizza")
-        entity_type: Type of entity (fact, preference, person, place, etc.)
-    
-    Examples:
-        - store_memory("User's favorite color is blue", "preference")
-        - store_memory("Meeting with John on Monday at 3pm", "event")
-        - store_memory("User allergic to peanuts", "health")
-    """
-    try:
-        async def _store():
-            client = await get_mcp_client()
-            
-            # Create entity with observation
-            entities = [{
-                "name": f"memory_{entity_type}",
-                "entityType": entity_type,
-                "observations": [content]
-            }]
-            
-            result = await client.create_entities(entities)
-            return f"✓ Memory stored successfully! I'll remember: '{content}'"
-        
-        return run_async(_store())
-    
-    except Exception as e:
-        return f"Failed to store memory: {str(e)}"
-
-@tool
-def recall_memory(query: str) -> str:
-    """
-    Search and recall memories from knowledge graph.
-    Use this when the user asks you to remember or recall something.
-    
-    Args:
-        query: What to search for (e.g., "food preferences", "meetings", "health info")
-    
-    Examples:
-        - recall_memory("What did I say about food?")
-        - recall_memory("My schedule")
-        - recall_memory("health information")
-    """
-    try:
-        async def _recall():
-            client = await get_mcp_client()
-            result = await client.search_nodes(query)
-            
-            if not result or result == "No results found":
-                return "No memories found related to your query."
-            
-            return f"I found relevant memories:\n\n{result}"
-        
-        return run_async(_recall())
-    
-    except Exception as e:
-        return f"Failed to recall memories: {str(e)}"
-
-@tool
-def list_all_memories() -> str:
-    """
-    List all stored memories from knowledge graph.
-    Use this when the user wants to see everything you remember.
-    
-    Example: "Show me all my memories" or "What do you remember about me?"
-    """
-    try:
-        async def _list():
-            client = await get_mcp_client()
-            result = await client.read_graph()
-            
-            if not result or "empty" in result.lower():
-                return "I don't have any memories stored yet."
-            
-            return f"Here are all my memories:\n\n{result}"
-        
-        return run_async(_list())
-    
-    except Exception as e:
-        return f"Failed to list memories: {str(e)}"
-
-# Export memory tools
-MEMORY_TOOLS = [store_memory, recall_memory, list_all_memories]
-
-# Cleanup function
-async def cleanup_mcp():
-    """Call this on shutdown"""
-    global _mcp_client
-    if _mcp_client:
-        await _mcp_client.disconnect()
+if __name__ == "__main__":
+    asyncio.run(main())

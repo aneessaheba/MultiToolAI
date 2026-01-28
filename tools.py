@@ -512,8 +512,8 @@ ALL_TOOLS = [
     summarize_text,
     
     #  Memory tools
-    store_memory,          # Store new memories
-    recall_memory,         # Semantic search in memories
-    list_all_memories,     # List all memories
-    clear_all_memories     # Clear all memories
+    # store_memory,          # Store new memories
+    # recall_memory,         # Semantic search in memories
+    # list_all_memories,     # List all memories
+    # clear_all_memories     # Clear all memories
 ]

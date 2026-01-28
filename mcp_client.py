@@ -1,153 +1,141 @@
 """
-MCP Client - Wraps MCP servers as LangChain tools
-Hybrid approach: LangChain agent + MCP servers
+MCP Client - Connect to MCP servers
+Currently supports: Calculator and Memory
 """
 
+import os
 import asyncio
-from typing import Dict
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from langchain.agents import tool
+from mcp_tools import MCP_SERVERS
 
-# Global dictionary to store MCP sessions
-_mcp_sessions: Dict[str, ClientSession] = {}
-_exit_stacks: Dict[str, any] = {}
+# Global sessions for MCP servers
+calculator_session = None
+memory_session = None
 
-async def connect_mcp_server(server_name: str, command: str, args: list):
-    """
-    Connect to an MCP server and store the session.
+# Connect to Calculator MCP Server
+async def connect_calculator():
+    """Connect to MCP calculator server"""
+    global calculator_session
     
-    Args:
-        server_name: Name to identify the server (e.g., "calculator")
-        command: Command to run (e.g., "python")
-        args: Arguments for the command (e.g., ["mcp_calculator.py"])
-    """
-    global _mcp_sessions, _exit_stacks
-    
-    # If already connected, return existing session
-    if server_name in _mcp_sessions:
-        return _mcp_sessions[server_name]
-    
-    # Define server parameters
-    server_params = StdioServerParameters(
-        command=command,
-        args=args,
-        env=None
-    )
-    
-    # Connect to server
-    stdio_transport = stdio_client(server_params)
-    stdio, write = await stdio_transport.__aenter__()
-    
-    # Store exit stack for cleanup
-    _exit_stacks[server_name] = stdio_transport
-    
-    # Create session
-    session = ClientSession(stdio, write)
-    await session.__aenter__()
-    
-    # Initialize session
-    await session.initialize()
-    
-    # Store session
-    _mcp_sessions[server_name] = session
-    
-    print(f"✓ Connected to {server_name} MCP server")
-    
-    return session
-
-async def call_mcp_tool(server_name: str, tool_name: str, arguments: dict) -> str:
-    """
-    Call a tool on an MCP server.
-    
-    Args:
-        server_name: Name of the server (e.g., "calculator")
-        tool_name: Name of the tool (e.g., "calculate")
-        arguments: Tool arguments (e.g., {"expression": "5+3"})
-    
-    Returns:
-        Tool result as string
-    """
-    
-    # Get or create session
-    if server_name not in _mcp_sessions:
-        raise ValueError(f"MCP server '{server_name}' not connected. Call connect_mcp_server first.")
-    
-    session = _mcp_sessions[server_name]
-    
-    # Call the tool
-    result = await session.call_tool(tool_name, arguments=arguments)
-    
-    # Extract text from result
-    if result.content and len(result.content) > 0:
-        return result.content[0].text
-    else:
-        return "No result returned"
-
-def run_async(coro):
-    """
-    Helper to run async functions in sync context.
-    Needed because LangChain tools are synchronous but MCP is async.
-    """
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(coro)
-
-# LangChain Tool: Calculator
-@tool
-def mcp_calculator(expression: str) -> str:
-    """
-    Evaluate mathematical expressions using MCP Calculator Server.
-    Use this for any math calculations.
-    
-    Args:
-        expression: Math expression to evaluate (e.g., "5 + 3", "(10 * 2) / 4")
-    
-    Examples:
-        mcp_calculator("5 + 3") returns "8"
-        mcp_calculator("10 * 2") returns "20"
-    """
-    
-    async def _calculate():
-        # Connect to calculator server if not already connected
-        await connect_mcp_server(
-            server_name="calculator",
+    if calculator_session is None:
+        server_params = StdioServerParameters(
             command="python",
-            args=["mcp_calculator.py"]  # No folder - file in root directory
+            args=["mcp_calculator.py"]
         )
         
-        # Call the calculate tool
-        result = await call_mcp_tool(
-            server_name="calculator",
-            tool_name="calculate",
-            arguments={"expression": expression}
+        read_stream, write_stream = await stdio_client(server_params).__aenter__()
+        calculator_session = ClientSession(read_stream, write_stream)
+        await calculator_session.initialize()
+    
+    return calculator_session
+
+# Connect to Memory MCP Server
+async def connect_memory():
+    """Connect to MCP memory server"""
+    global memory_session
+    
+    if memory_session is None:
+        server_params = StdioServerParameters(
+            command="python",
+            args=["mcp_memory.py"]
         )
         
-        return result
+        read_stream, write_stream = await stdio_client(server_params).__aenter__()
+        memory_session = ClientSession(read_stream, write_stream)
+        await memory_session.initialize()
     
-    return run_async(_calculate())
+    return memory_session
 
-# Export MCP tools for LangChain agent
-MCP_TOOLS = [mcp_calculator]
+# CALCULATOR MCP TOOL
 
-# Cleanup function
-async def cleanup_mcp():
-    """
-    Disconnect from all MCP servers.
-    Call this when shutting down.
-    """
-    global _mcp_sessions, _exit_stacks
+@tool
+def mcp_calculator(expression: str) -> float:
+    """Calculate math expressions using MCP Calculator."""
+    if not MCP_SERVERS["calculator"]["enabled"]:
+        raise ValueError("MCP Calculator not enabled")
     
-    for server_name, session in _mcp_sessions.items():
-        await session.__aexit__(None, None, None)
-        print(f"✓ Disconnected from {server_name}")
+    async def call_mcp():
+        session = await connect_calculator()
+        result = await session.call_tool("calculate", {"expression": expression})
+        return result.content[0].text
     
-    for server_name, exit_stack in _exit_stacks.items():
-        await exit_stack.__aexit__(None, None, None)
+    result = asyncio.run(call_mcp())
+    return result
+
+# MEMORY MCP TOOLS
+
+@tool
+def mcp_store_memory(content: str, tags: str = "") -> str:
+    """Store information in long-term memory using MCP Memory server."""
+    if not MCP_SERVERS["memory"]["enabled"]:
+        raise ValueError("MCP Memory not enabled")
     
-    _mcp_sessions = {}
-    _exit_stacks = {}
+    async def call_mcp():
+        session = await connect_memory()
+        result = await session.call_tool("store_memory", {"content": content, "tags": tags})
+        return result.content[0].text
+    
+    return asyncio.run(call_mcp())
+
+@tool
+def mcp_recall_memory(query: str, num_results: int = 3) -> str:
+    """Search and recall memories using MCP Memory server."""
+    if not MCP_SERVERS["memory"]["enabled"]:
+        raise ValueError("MCP Memory not enabled")
+    
+    async def call_mcp():
+        session = await connect_memory()
+        result = await session.call_tool("recall_memory", {"query": query, "num_results": num_results})
+        return result.content[0].text
+    
+    return asyncio.run(call_mcp())
+
+@tool
+def mcp_list_all_memories() -> str:
+    """List all stored memories using MCP Memory server."""
+    if not MCP_SERVERS["memory"]["enabled"]:
+        raise ValueError("MCP Memory not enabled")
+    
+    async def call_mcp():
+        session = await connect_memory()
+        result = await session.call_tool("list_all_memories", {})
+        return result.content[0].text
+    
+    return asyncio.run(call_mcp())
+
+@tool
+def mcp_clear_all_memories() -> str:
+    """Delete all stored memories using MCP Memory server."""
+    if not MCP_SERVERS["memory"]["enabled"]:
+        raise ValueError("MCP Memory not enabled")
+    
+    async def call_mcp():
+        session = await connect_memory()
+        result = await session.call_tool("clear_all_memories", {})
+        return result.content[0].text
+    
+    return asyncio.run(call_mcp())
+
+# Get enabled MCP tools
+def get_mcp_tools():
+    """Returns list of enabled MCP tools"""
+    tools = []
+    
+    # Calculator MCP
+    if MCP_SERVERS["calculator"]["enabled"]:
+        tools.append(mcp_calculator)
+    
+    # Memory MCP - adds 4 tools
+    if MCP_SERVERS["memory"]["enabled"]:
+        tools.extend([
+            mcp_store_memory,
+            mcp_recall_memory,
+            mcp_list_all_memories,
+            mcp_clear_all_memories
+        ])
+    
+    return tools
+
+MCP_TOOLS = get_mcp_tools()
