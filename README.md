@@ -14,14 +14,16 @@ AI assistant powered by Google Gemini with multiple tools and semantic memory.
 - Text Summarizer
 - Memory System (semantic search with ChromaDB)
 
-## Installation
+### MCP Integration
+- MCP Calculator Server
+- MCP Memory Server (disabled, using ChromaDB)
 
+## Installation
 ```bash
-pip install langchain langchain-google-genai chromadb wikipedia googlesearch-python beautifulsoup4 requests python-dotenv fastapi uvicorn
+pip install langchain langchain-google-genai chromadb wikipedia googlesearch-python beautifulsoup4 requests python-dotenv fastapi uvicorn mcp
 ```
 
 Create `.env` file:
-
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
 EMAIL_ADDRESS=your_email@gmail.com
@@ -45,9 +47,8 @@ uvicorn api:app --reload
 API Documentation: http://localhost:8000/docs
 
 ## Project Structure
-
 ```
-CALCULATOR_MULTI_AGENT/
+multi_agent/
 ├── chroma_memory/          # Memory database
 ├── venv/                   # Virtual environment
 ├── .env                    # Environment variables
@@ -55,6 +56,10 @@ CALCULATOR_MULTI_AGENT/
 ├── api.py                  # FastAPI server
 ├── gemini_service.py       # Agent configuration
 ├── main.py                 # Command-line interface
-├── tools.py                # All tools including memory
+├── tools.py                # Regular tools
+├── mcp_calculator.py       # MCP calculator server
+├── mcp_memory.py           # MCP memory server
+├── mcp_tools.py            # MCP configuration
+├── mcp_client.py           # MCP client connector
 └── README.md
 ```
