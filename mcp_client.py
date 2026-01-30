@@ -13,6 +13,7 @@ from mcp_tools import MCP_SERVERS
 # Global sessions for MCP servers
 calculator_session = None
 memory_session = None
+weather_session = None  # NEW: Weather session
 
 # Connect to Calculator MCP Server
 async def connect_calculator():
@@ -48,6 +49,23 @@ async def connect_memory():
     
     return memory_session
 
+# NEW: Connect to Weather MCP Server
+async def connect_weather():
+    """Connect to MCP weather server"""
+    global weather_session
+    
+    if weather_session is None:
+        server_params = StdioServerParameters(
+            command="python",
+            args=["mcp_weather.py"]
+        )
+        
+        read_stream, write_stream = await stdio_client(server_params).__aenter__()
+        weather_session = ClientSession(read_stream, write_stream)
+        await weather_session.initialize()
+    
+    return weather_session
+
 # CALCULATOR MCP TOOL
 
 @tool
@@ -63,6 +81,21 @@ def mcp_calculator(expression: str) -> float:
     
     result = asyncio.run(call_mcp())
     return result
+
+# NEW: MCP Weather Tool
+
+@tool
+def mcp_weather(city: str) -> str:
+    """Get current weather for a city using MCP Weather server."""
+    if not MCP_SERVERS["weather"]["enabled"]:
+        raise ValueError("MCP Weather not enabled")
+    
+    async def call_mcp():
+        session = await connect_weather()
+        result = await session.call_tool("get_weather", {"city": city})
+        return result.content[0].text
+    
+    return asyncio.run(call_mcp())
 
 # MEMORY MCP TOOLS
 
@@ -126,6 +159,10 @@ def get_mcp_tools():
     # Calculator MCP
     if MCP_SERVERS["calculator"]["enabled"]:
         tools.append(mcp_calculator)
+    
+    # NEW: Weather MCP
+    if MCP_SERVERS["weather"]["enabled"]:
+        tools.append(mcp_weather)
     
     # Memory MCP - adds 4 tools
     if MCP_SERVERS["memory"]["enabled"]:

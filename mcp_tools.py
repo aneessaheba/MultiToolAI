@@ -12,8 +12,7 @@ MCP_SERVERS = {
     },
     "weather": {
         "package": "@timlukahorstmann/mcp-weather",
-        "enabled": False,
-        "requires_env": "ACCUWEATHER_API_KEY",
+        "enabled": True,  # ENABLED: Using wttr.in (no API key needed)
         "replaces": "get_weather"
     },
     "wikipedia": {
