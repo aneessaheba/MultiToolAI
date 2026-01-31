@@ -34,7 +34,7 @@ MCP_SERVERS = {
     },
     "gmail": {
         "package": "@modelcontextprotocol/server-gmail",
-        "enabled": False,
+        "enabled": False,  # DISABLED: Timeout issues with SMTP in MCP context
         "replaces": "send_email"
     },
     "memory": {
